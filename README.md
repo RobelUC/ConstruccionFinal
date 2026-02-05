@@ -1,4 +1,4 @@
-# Proyecto Gestor de Tareas
+# Proyecto: Gestor de Tareas
 
 ## Descripción General
 
@@ -18,10 +18,10 @@ Adicionalmente, el proyecto tiene como propósito aplicar buenas prácticas de i
 
 ## Integrantes del Equipo
 
-- [Nombre y apellido del integrante 1]
-- [Nombre y apellido del integrante 2]
-- [Nombre y apellido del integrante 3]
-- [Nombre y apellido del integrante 4]
+- Cabezas Yupanqui Daniel Ricardo
+- Ramos Ore Dennis Jhordan
+- Surichaqui Hurtado Jackelin Lizeth
+- Urbano Cortez Robel Gabriel
 
 ## Instrucciones para la Ejecución del Proyecto
 
@@ -84,3 +84,4 @@ Adicionalmente, el proyecto tiene como propósito aplicar buenas prácticas de i
 
 Este proyecto ha sido desarrollado como parte de la asignatura **Construcción de Software**, siguiendo las buenas prácticas de desarrollo colaborativo, control de versiones y pruebas automatizadas.
 ```
+
