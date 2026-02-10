@@ -1,133 +1,153 @@
+"""
+Lógica principal del negocio.
+Controla la interacción entre la base de datos, los usuarios y las tareas.
+"""
+
+from src.modelo.modelo import Database
+from src.modelo.task import Task
 import hashlib
-import os
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from sqlalchemy.exc import IntegrityError
 
-# 1. Definimos la Base del ORM
-Base = declarative_base()
 
-# 2. Definimos la Tabla 'Usuario' como una Clase
-class Usuario(Base):
-    __tablename__ = 'usuarios'
-    
-    id = Column(Integer, primary_key=True)
-    email = Column(String, unique=True, nullable=False)
-    password = Column(String, nullable=False)
-    nombre = Column(String)
-    apellido = Column(String)
-    fecha_nacimiento = Column(String)
-    genero = Column(String)
-    
-    # Relación: Un usuario tiene muchas tareas
-    tareas = relationship("Tarea", back_populates="usuario")
-
-# 3. Definimos la Tabla 'Tarea' como una Clase
-class Tarea(Base):
-    __tablename__ = 'tareas'
-    
-    id_task = Column(Integer, primary_key=True) # Usamos id_task para compatibilidad con tu main.py
-    titulo = Column(String, nullable=False)
-    descripcion = Column(String)
-    estado = Column(String, default='pendiente')
-    usuario_id = Column(Integer, ForeignKey('usuarios.id'))
-    
-    # Relación inversa
-    usuario = relationship("Usuario", back_populates="tareas")
-
-# 4. El Gestor Principal (Logic Layer)
 class TaskManager:
+    """
+    Controlador principal. 
+    Maneja la autenticación de usuarios y las operaciones CRUD de tareas.
+    """
+
     def __init__(self):
-        # Configuración de la Base de Datos
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.abspath(os.path.join(base_dir, '..', '..'))
-        db_path = os.path.join(project_root, 'tasks.db')
-        
-        # Conexión con SQLAlchemy (SQLite)
-        self.engine = create_engine(f'sqlite:///{db_path}', echo=False)
-        self.Session = sessionmaker(bind=self.engine)
-        self.usuario_actual_id = None
+        self.db = Database()
+        # Guardamos la ruta en una variable para poder modificarla en los tests
+        self.db_path = self.db.db_path
+
+    def _conectar(self):
+        """
+        Actualiza la ruta de la BD y establece la conexión.
+        Es necesario actualizar self.db.db_path aquí para soportar el cambio de BD en tests.
+        """
+        self.db.db_path = self.db_path
+        return self.db.conectar()
 
     def inicializar_db(self):
-        # Esto crea las tablas automáticamente si no existen
-        Base.metadata.create_all(self.engine)
+        """Genera las tablas de usuarios y tareas si no existen."""
+        self.db.db_path = self.db_path
 
-    def _hash_password(self, password):
-        return hashlib.sha256(password.encode()).hexdigest()
+        conn = self._conectar()
+        if conn:
+            cursor = conn.cursor()
 
-    def registrar_usuario(self, email, password, nombre, apellido, nacimiento, genero):
-        if not email or not password:
-            raise ValueError("El email y la contraseña son obligatorios")
-            
-        session = self.Session()
-        try:
-            nuevo_usuario = Usuario(
-                email=email,
-                password=self._hash_password(password),
-                nombre=nombre,
-                apellido=apellido,
-                fecha_nacimiento=nacimiento,
-                genero=genero
-            )
-            session.add(nuevo_usuario)
-            session.commit()
-            return True
-        except IntegrityError:
-            session.rollback() # Cancelar si hay error (ej: correo duplicado)
-            raise ValueError("El correo ya está registrado.")
-        finally:
-            session.close()
+            # Tabla Tareas
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    titulo TEXT NOT NULL,
+                    descripcion TEXT,
+                    estado TEXT NOT NULL DEFAULT 'pendiente'
+                )
+            ''')
+
+            # Tabla Usuarios
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    nombre TEXT,
+                    apellido TEXT,
+                    fecha_nacimiento TEXT,
+                    genero TEXT
+                )
+            ''')
+            conn.commit()
+            conn.close()
+
+    # ---------------------------------------------------------
+    # GESTIÓN DE USUARIOS
+    # ---------------------------------------------------------
+
+    def registrar_usuario(self, email, password, nombre, apellido, fecha, genero):
+        """
+        Registra un nuevo usuario en la base de datos.
+        Aplica hash SHA-256 a la contraseña antes de guardar.
+        """
+        conn = self._conectar()
+        if conn:
+            cursor = conn.cursor()
+            try:
+                pass_hash = hashlib.sha256(password.encode()).hexdigest()
+
+                cursor.execute('''
+                    INSERT INTO usuarios (email, password, nombre, apellido, fecha_nacimiento, genero)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (email, pass_hash, nombre, apellido, fecha, genero))
+                conn.commit()
+            except Exception as e:
+                conn.close()
+                raise ValueError(f"Error al registrar: {e}")
+            conn.close()
 
     def login(self, email, password):
-        session = self.Session()
-        pass_cifrada = self._hash_password(password)
-        
-        # Buscamos al usuario usando filtros de objetos, no SQL
-        usuario = session.query(Usuario).filter_by(email=email, password=pass_cifrada).first()
-        
-        session.close()
-        
-        if usuario:
-            self.usuario_actual_id = usuario.id
-            return self.usuario_actual_id
-        else:
-            return None
+        """
+        Verifica las credenciales del usuario.
+        Retorna el ID del usuario si el login es correcto, o None si falla.
+        """
+        conn = self._conectar()
+        user_id = None
+        if conn:
+            cursor = conn.cursor()
+            # Hasheamos la entrada para comparar con la BD
+            pass_hash = hashlib.sha256(password.encode()).hexdigest()
 
-    def listar_tareas(self):
-        if self.usuario_actual_id is None:
-            return []
-            
-        session = self.Session()
-        # Traemos todas las tareas de este usuario
-        tareas = session.query(Tarea).filter_by(usuario_id=self.usuario_actual_id).all()
-        session.close()
-        return tareas
+            cursor.execute(
+                'SELECT id FROM usuarios WHERE email = ? AND password = ?', (email, pass_hash))
+            resultado = cursor.fetchone()
+
+            if resultado:
+                user_id = resultado[0]
+            conn.close()
+        return user_id
+
+    # ---------------------------------------------------------
+    # GESTIÓN DE TAREAS
+    # ---------------------------------------------------------
 
     def agregar_tarea(self, titulo, descripcion):
-        if not self.usuario_actual_id: return
-        
-        session = self.Session()
-        nueva_tarea = Tarea(
-            titulo=titulo, 
-            descripcion=descripcion, 
-            usuario_id=self.usuario_actual_id
-        )
-        session.add(nueva_tarea)
-        session.commit()
-        session.close()
+        """Guarda una nueva tarea con estado 'pendiente'."""
+        if not titulo:
+            raise ValueError("El título no puede estar vacío")
 
-    def marcar_completada(self, id_tarea):
-        session = self.Session()
-        tarea = session.query(Tarea).get(id_tarea)
-        if tarea:
-            tarea.estado = 'completada' if tarea.estado == 'pendiente' else 'pendiente'
-            session.commit()
-        session.close()
+        conn = self._conectar()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO tasks (titulo, descripcion, estado) VALUES (?, ?, ?)",
+                           (titulo, descripcion, 'pendiente'))
+            conn.commit()
+            conn.close()
 
-    def eliminar_tarea(self, id_tarea):
-        session = self.Session()
-        tarea = session.query(Tarea).get(id_tarea)
-        if tarea:
-            session.delete(tarea)
-            session.commit()
-        session.close()
+    def listar_tareas(self):
+        """Recupera todas las tareas y retorna una lista de objetos Task."""
+        conn = self._conectar()
+        tareas = []
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT titulo, descripcion, estado, id FROM tasks")
+            rows = cursor.fetchall()
+            for row in rows:
+                nueva_tarea = Task(
+                    titulo=row[0], descripcion=row[1], estado=row[2], id_task=row[3])
+                tareas.append(nueva_tarea)
+            conn.close()
+        return tareas
+
+    def eliminar_tarea(self, id_task):
+        """Elimina una tarea basada en su ID."""
+        conn = self._conectar()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM tasks WHERE id = ?", (id_task,))
+            if not cursor.fetchone():
+                conn.close()
+                raise ValueError("La tarea no existe")
+
+            cursor.execute("DELETE FROM tasks WHERE id = ?", (id_task,))
+            conn.commit()
+            conn.close()

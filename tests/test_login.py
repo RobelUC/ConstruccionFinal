@@ -1,51 +1,70 @@
+"""
+Pruebas unitarias para el módulo de autenticación.
+Valida el registro de usuarios y la seguridad del inicio de sesión.
+"""
+
+from src.logica.task_manager import TaskManager
 import unittest
 import sys
 import os
-import shutil
 
-# Truco para importar desde la carpeta src
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from logica.task_manager import TaskManager
+# --- CONFIGURACIÓN DE RUTAS ---
+# Ajusta el path para permitir importaciones desde la carpeta 'src'
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.abspath(os.path.join(current_dir, '..'))
+sys.path.insert(0, root_dir)
+
 
 class TestLogin(unittest.TestCase):
-    
+    """
+    Suite de pruebas para validar el flujo de acceso.
+    Usa una base de datos temporal para garantizar pruebas limpias y aisladas.
+    """
+
     def setUp(self):
-        # Se ejecuta ANTES de cada test: Preparamos el entorno
+        """
+        Prepara el entorno creando una base de datos de prueba antes de cada test.
+        """
         self.manager = TaskManager()
-        # Usamos una BD de prueba para no borrar la tuya real
-        self.manager.db_path = "test_tasks.db" 
+        self.manager.db_path = "test_login.db"
         self.manager.inicializar_db()
 
     def tearDown(self):
-        # Se ejecuta DESPUÉS de cada test: Limpiamos basura
-        if os.path.exists("test_tasks.db"):
-            os.remove("test_tasks.db")
+        """
+        Limpia el entorno eliminando el archivo de base de datos tras cada prueba.
+        """
+        if os.path.exists("test_login.db"):
+            try:
+                os.remove("test_login.db")
+            except PermissionError:
+                pass
 
     def test_registro_y_login_exitoso(self):
-        # 1. Intentamos registrar un usuario
+        """
+        Verifica que un usuario registrado pueda iniciar sesión con sus credenciales.
+        """
         self.manager.registrar_usuario(
-            "test@correo.com", "12345", "Juan", "Perez", "01/01/2000", "M"
+            "juan@test.com", "12345", "Juan", "Perez", "01/01/2000", "M"
         )
-        
-        # 2. Intentamos loguearnos con esos datos
-        user_id = self.manager.login("test@correo.com", "12345")
-        
-        # 3. VERIFICACIÓN (Assert): El user_id no debe ser None
-        self.assertIsNotNone(user_id, "El login falló: Debería devolver un ID")
-        print("✅ Test Login Exitoso: PASÓ")
+
+        user_id = self.manager.login("juan@test.com", "12345")
+
+        self.assertIsNotNone(
+            user_id, "El login falló con credenciales válidas")
 
     def test_login_fallido_clave_incorrecta(self):
-        # 1. Registramos usuario
+        """
+        Comprueba que el sistema bloquee el acceso cuando la contraseña es errónea.
+        """
         self.manager.registrar_usuario(
-            "test@correo.com", "12345", "Juan", "Perez", "01/01/2000", "M"
+            "maria@test.com", "54321", "Maria", "Gomez", "01/01/1990", "F"
         )
-        
-        # 2. Intentamos entrar con clave mala
-        user_id = self.manager.login("test@correo.com", "CLAVE_MALA")
-        
-        # 3. VERIFICACIÓN: Debería ser None
-        self.assertIsNone(user_id, "El login debió fallar y no lo hizo")
-        print("✅ Test Login Fallido: PASÓ")
+
+        user_id = self.manager.login("maria@test.com", "CLAVE_ERRONEA")
+
+        self.assertIsNone(
+            user_id, "El login no debería permitir el ingreso con clave incorrecta")
+
 
 if __name__ == '__main__':
     unittest.main()

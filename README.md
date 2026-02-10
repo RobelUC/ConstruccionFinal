@@ -30,6 +30,8 @@ Adicionalmente, el proyecto tiene como propósito aplicar buenas prácticas de i
 - Python 3.8 o superior instalado.
 - Git instalado (para clonar el repositorio).
 - Conexión a internet (solo para clonar).
+- Flet.
+- Sqlalchemy.
 
 ### Pasos para Ejecutar
 
@@ -58,30 +60,19 @@ Adicionalmente, el proyecto tiene como propósito aplicar buenas prácticas de i
 
 ```
 .
-├── README.md
-├── .gitignore
-├── requirements.txt (si aplica)
 ├── src/
-│   ├── main.py
-│   ├── modules/
-│   └── database/
-│       └── DB.sqlite
+│   ├── logica/
+│   │   ├── __init__.py
+│   │   └── task_manager.py   # Lógica de Negocio y Modelos ORM
+│   └── __init__.py
 ├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── system/
-└── docs/ (opcional)
+│   ├── test_login.py         # Pruebas unitarias para Autenticación
+│   └── test_tasks.py         # Pruebas unitarias para CRUD de Tareas
+├── main.py                   # Interfaz Gráfica (Frontend - Flet)
+├── requirements.txt          # Lista de dependencias
+└── README.md                 # Documentación del proyecto
+
 ```
-
-### Notas Importantes
-
-- La base de datos se crea automáticamente en `src/database/DB.sqlite` al ejecutar la aplicación por primera vez.
-- Asegúrate de tener permisos de escritura en el directorio del proyecto.
-- El proyecto sigue un enfoque TDD, por lo que todas las funcionalidades están respaldadas por pruebas automatizadas.
-
----
-
-
 Este proyecto ha sido desarrollado como parte de la asignatura **Construcción de Software**, siguiendo las buenas prácticas de desarrollo colaborativo, control de versiones y pruebas automatizadas.
 ```
 
