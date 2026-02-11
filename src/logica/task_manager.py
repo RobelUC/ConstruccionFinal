@@ -39,6 +39,15 @@ class TaskManager:
                 raise ValueError("Contraseña incorrecta.")
 
             return user
+        except ValueError as e:
+            raise e
+
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise e
+            
+            print(f"Error DB: {e}")
+            raise ValueError("Error de conexión con la base de datos.")
         finally:
             session.close()
 
