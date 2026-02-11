@@ -19,7 +19,7 @@ def main(page: ft.Page):
     """
     page.title = "Paso 1: Acceso"
     page.window_width = 400
-    page.window_height = 600
+    page.window_height = 650
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.theme_mode = ft.ThemeMode.LIGHT
 
@@ -35,49 +35,56 @@ def main(page: ft.Page):
         email = ft.TextField(label="Correo Electrónico", width=280)
         password = ft.TextField(label="Contraseña", password=True, width=280)
 
+        # Función para cerrar la alerta de error
+        def cerrar_dialogo(e):
+            page.dialog.open = False
+            page.update()
+
         def funcion_entrar(e):
-            """Valida los campos e intenta iniciar sesión."""
-            if not email.value or not password.value:
-                page.snack_bar = ft.SnackBar(
-                    ft.Text("Por favor, ingrese todos los datos"))
-                page.snack_bar.open = True
-                page.update()
-                return
+            # 1. Limpieza total de estados previos
+            email.error_text = None
+            password.error_text = None
+            page.dialog = None # Limpiamos cualquier diálogo viejo
+            page.update()
 
             try:
-                # Intentamos loguear
+                print(f"Intentando login para: {email.value}")
                 usuario = manager.login(email.value, password.value)
-
-                # Si llegamos aquí, el login fue exitoso
+                print("Login exitoso")
                 mostrar_exito(usuario)
 
-            except ValueError as error:
-                # 1. Errores de Validación (Correo no existe / Clave mal)
-                page.snack_bar = ft.SnackBar(
-                    ft.Text(str(error)),
-                    bgcolor="orange"
+            except ValueError as err:
+                print(f"ERROR CAPTURADO: {err}")
+                
+                # Creamos el diálogo de forma independiente
+                alerta = ft.AlertDialog(
+                    modal=True, # Obliga al usuario a interactuar
+                    title=ft.Text("⚠️ Error de Acceso"),
+                    content=ft.Text(str(err)),
+                    actions=[
+                        ft.TextButton("Entendido", on_click=cerrar_dialogo)
+                    ],
+                    actions_alignment=ft.MainAxisAlignment.END,
                 )
-                page.snack_bar.open = True
+                
+                # ASIGNACIÓN Y APERTURA FORZADA
+                page.dialog = alerta
+                alerta.open = True
                 page.update()
 
-            except Exception as error:
-                # 2. Errores Inesperados (Base de datos, código, etc.)
-                # ESTO ES LO QUE AGREGUÉ PARA MAYOR SEGURIDAD
-                print(f"Error crítico: {error}")  # Para ver en consola
-                page.snack_bar = ft.SnackBar(
-                    ft.Text(f"Error del sistema: {str(error)}"),
-                    bgcolor="red"
-                )
+            except Exception as ex:
+                print(f"FALLO CRÍTICO: {ex}")
+                page.snack_bar = ft.SnackBar(ft.Text("Error de sistema"))
                 page.snack_bar.open = True
                 page.update()
-
+                
         def ir_registro(e):
             mostrar_registro()
 
         page.add(
             ft.Column(
                 [
-                    ft.Text("🔐", size=80),
+                    ft.Text("🔐", size=80),  # TUS ICONOS ORIGINALES
                     ft.Text("Bienvenido", size=30, weight="bold"),
                     ft.Container(height=20),
                     email,
@@ -147,7 +154,7 @@ def main(page: ft.Page):
         page.add(
             ft.Column(
                 [
-                    ft.Text("📝", size=60),
+                    ft.Text("📝", size=60), # TUS ICONOS ORIGINALES
                     ft.Text("Crear Cuenta", size=25, weight="bold"),
                     txt_nombre, txt_apellido, txt_email, txt_pass, txt_fecha, dd_genero,
                     ft.Container(height=10),
@@ -170,7 +177,7 @@ def main(page: ft.Page):
         page.add(
             ft.Column(
                 [
-                    ft.Text("✅", size=100),
+                    ft.Text("✅", size=100), # TUS ICONOS ORIGINALES
                     ft.Text(f"¡Hola {usuario.nombre}!",
                             size=30, weight="bold", color="green"),
                     ft.Text("Has iniciado sesión correctamente."),
