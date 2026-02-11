@@ -1,6 +1,6 @@
 """
 Interfaz gráfica del Gestor de Tareas desarrollada con Flet.
-Maneja la visualización de pantallas y la comunicación con el controlador.
+Maneja la visualización de pantallas, la comunicación con el controlador y el feedback de errores.
 """
 
 from src.logica.task_manager import TaskManager
@@ -9,7 +9,6 @@ import sys
 import os
 
 # --- CONFIGURACIÓN DE RUTAS ---
-# Permite que el script encuentre el paquete 'src' sin importar el directorio de ejecución.
 sys.path.append(os.path.abspath(
     os.path.join(os.path.dirname(__file__), 'src')))
 
@@ -24,21 +23,13 @@ def main(page: ft.Page):
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    # Inicialización del controlador y la base de datos
+    # Inicialización del controlador
     manager = TaskManager()
-    try:
-        manager.inicializar_db()
-        print("Base de datos conectada correctamente.")
-    except Exception as e:
-        page.add(ft.Text(f"Error conectando BD: {e}", color="red"))
 
     # ---------------------------------------------------------
     # VISTA: LOGIN
     # ---------------------------------------------------------
     def mostrar_login():
-        """
-        Renderiza el formulario de acceso y gestiona la validación de credenciales.
-        """
         page.clean()
 
         email = ft.TextField(label="Correo Electrónico", width=280)
@@ -47,25 +38,42 @@ def main(page: ft.Page):
         def funcion_entrar(e):
             """Valida los campos e intenta iniciar sesión."""
             if not email.value or not password.value:
-                page.snack_bar = ft.SnackBar(ft.Text("Faltan datos"))
+                page.snack_bar = ft.SnackBar(
+                    ft.Text("Por favor, ingrese todos los datos"))
                 page.snack_bar.open = True
                 page.update()
                 return
 
-            user_id = manager.login(email.value, password.value)
+            try:
+                # Intentamos loguear
+                usuario = manager.login(email.value, password.value)
 
-            if user_id:
-                mostrar_exito(user_id)
-            else:
+                # Si llegamos aquí, el login fue exitoso
+                mostrar_exito(usuario)
+
+            except ValueError as error:
+                # 1. Errores de Validación (Correo no existe / Clave mal)
                 page.snack_bar = ft.SnackBar(
-                    ft.Text("Correo o clave incorrectos"), bgcolor="red")
+                    ft.Text(str(error)),
+                    bgcolor="orange"
+                )
+                page.snack_bar.open = True
+                page.update()
+
+            except Exception as error:
+                # 2. Errores Inesperados (Base de datos, código, etc.)
+                # ESTO ES LO QUE AGREGUÉ PARA MAYOR SEGURIDAD
+                print(f"Error crítico: {error}")  # Para ver en consola
+                page.snack_bar = ft.SnackBar(
+                    ft.Text(f"Error del sistema: {str(error)}"),
+                    bgcolor="red"
+                )
                 page.snack_bar.open = True
                 page.update()
 
         def ir_registro(e):
             mostrar_registro()
 
-        # Layout de la pantalla de login
         page.add(
             ft.Column(
                 [
@@ -89,9 +97,6 @@ def main(page: ft.Page):
     # VISTA: REGISTRO
     # ---------------------------------------------------------
     def mostrar_registro():
-        """
-        Formulario de creación de nuevos usuarios.
-        """
         page.clean()
 
         txt_nombre = ft.TextField(label="Nombre", width=280)
@@ -108,24 +113,37 @@ def main(page: ft.Page):
         )
 
         def funcion_guardar(e):
-            """Envía los datos al backend para el registro."""
-            try:
-                manager.registrar_usuario(
-                    txt_email.value, txt_pass.value, txt_nombre.value,
-                    txt_apellido.value, txt_fecha.value, dd_genero.value
-                )
+            if not txt_email.value or not txt_pass.value or not txt_nombre.value:
                 page.snack_bar = ft.SnackBar(
-                    ft.Text("¡Usuario Creado!"), bgcolor="green")
+                    ft.Text("Complete los campos obligatorios"), bgcolor="red")
                 page.snack_bar.open = True
-                mostrar_login()
+                page.update()
+                return
 
-            except ValueError as error:
+            try:
+                exito = manager.registrar_usuario(
+                    email=txt_email.value,
+                    password=txt_pass.value,
+                    nombre=txt_nombre.value
+                )
+
+                if exito:
+                    page.snack_bar = ft.SnackBar(
+                        ft.Text("¡Usuario Creado!"), bgcolor="green")
+                    page.snack_bar.open = True
+                    mostrar_login()
+                else:
+                    page.snack_bar = ft.SnackBar(
+                        ft.Text("Error: El correo ya está registrado"), bgcolor="red")
+                    page.snack_bar.open = True
+                    page.update()
+
+            except Exception as error:
                 page.snack_bar = ft.SnackBar(
-                    ft.Text(str(error)), bgcolor="red")
+                    ft.Text(f"Error inesperado: {str(error)}"), bgcolor="red")
                 page.snack_bar.open = True
                 page.update()
 
-        # Layout de la pantalla de registro
         page.add(
             ft.Column(
                 [
@@ -145,18 +163,15 @@ def main(page: ft.Page):
         page.update()
 
     # ---------------------------------------------------------
-    # VISTA: PANEL PRINCIPAL (SUCCESS)
+    # VISTA: PANEL PRINCIPAL
     # ---------------------------------------------------------
-    def mostrar_exito(user_id):
-        """
-        Pantalla de confirmación tras un login exitoso.
-        """
+    def mostrar_exito(usuario):
         page.clean()
         page.add(
             ft.Column(
                 [
                     ft.Text("✅", size=100),
-                    ft.Text(f"¡Hola Usuario {user_id}!",
+                    ft.Text(f"¡Hola {usuario.nombre}!",
                             size=30, weight="bold", color="green"),
                     ft.Text("Has iniciado sesión correctamente."),
                     ft.Divider(),
@@ -170,7 +185,6 @@ def main(page: ft.Page):
         )
         page.update()
 
-    # Inicio de la aplicación
     mostrar_login()
 
 

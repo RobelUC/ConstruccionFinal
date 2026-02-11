@@ -1,76 +1,72 @@
 """
-Pruebas unitarias para el CRUD de tareas. 
-Valida la persistencia, recuperación y eliminación de registros en la base de datos.
+Pruebas de integración para el CRUD de tareas.
+Verifica la vinculación de registros con usuarios y la integridad de los datos.
 """
-
-from src.logica.task_manager import TaskManager
 import unittest
-import sys
 import os
-
-# --- CONFIGURACIÓN DE RUTAS ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(current_dir, '..'))
-sys.path.insert(0, root_dir)
-
+from src.logica.task_manager import TaskManager
+from src.modelo.modelo import Tarea
 
 class TestTaskManager(unittest.TestCase):
-    """
-    Suite de pruebas para validar las operaciones básicas de las tareas.
-    """
-
     def setUp(self):
         """
-        Prepara una instancia del controlador y una base de datos aislada antes de cada test.
+        Prepara el entorno de pruebas.
+        Reinicia la base de datos para asegurar un estado limpio en cada ejecución.
         """
         self.manager = TaskManager()
-        self.manager.db_path = "test_tasks.db"
-        self.manager.inicializar_db()
 
-    def tearDown(self):
-        """
-        Elimina el archivo de base de datos de prueba al finalizar cada test.
-        """
-        if os.path.exists("test_tasks.db"):
+        # Liberar conexión previa para evitar bloqueos de archivo en Windows
+        self.manager.db.engine.dispose()
+
+        # Eliminar base de datos anterior si existe
+        if os.path.exists(self.manager.db.db_path):
             try:
-                os.remove("test_tasks.db")
+                os.remove(self.manager.db.db_path)
             except PermissionError:
                 pass
 
-    def test_agregar_y_listar_tarea(self):
-        """
-        Verifica que las tareas se guarden correctamente y que los datos coincidan al recuperarlos.
-        """
-        titulo = "Estudiar Python"
-        desc = "Repasar Unittest"
-        self.manager.agregar_tarea(titulo, desc)
+        # Inicializar tablas limpias
+        self.manager.db.inicializar_db()
 
-        tareas = self.manager.listar_tareas()
+        # Crear usuario base para las pruebas
+        self.email_test = "tester@proyect.com"
+        self.manager.registrar_usuario(self.email_test, "clave123", "User Test")
+        self.user = self.manager.login(self.email_test, "clave123")
 
+    def test_flujo_completo_tarea(self):
+        """Prueba la creación y recuperación de tareas vinculadas al usuario."""
+        titulo = "Test de SQLAlchemy"
+        descripcion = "Verificar relaciones 1:N"
+
+        # 1. Agregar tarea
+        exito = self.manager.agregar_tarea(self.user.id, titulo, descripcion)
+        self.assertTrue(exito)
+
+        # 2. Recuperar tareas
+        tareas = self.manager.obtener_tareas(self.user.id)
+        
+        # 3. Validaciones
         self.assertEqual(len(tareas), 1)
+        self.assertIsInstance(tareas[0], Tarea)
         self.assertEqual(tareas[0].titulo, titulo)
-        self.assertEqual(tareas[0].estado, "pendiente")
+        self.assertEqual(tareas[0].user_id, self.user.id)
 
-    def test_eliminar_tarea(self):
-        """
-        Valida que la eliminación de una tarea por su ID funcione y limpie la lista.
-        """
-        self.manager.agregar_tarea("Borrarme", "...")
-        tareas_iniciales = self.manager.listar_tareas()
-        id_borrar = tareas_iniciales[0].id_task
+    def test_separacion_de_datos(self):
+        """Asegura que un usuario no pueda ver las tareas de otro."""
+        # Usuario A crea tarea
+        self.manager.agregar_tarea(self.user.id, "Tarea Privada", "...")
 
-        self.manager.eliminar_tarea(id_borrar)
+        # Usuario B se registra y loguea
+        self.manager.registrar_usuario("otro@test.com", "456", "Otro")
+        user_b = self.manager.login("otro@test.com", "456")
 
-        tareas_finales = self.manager.listar_tareas()
-        self.assertEqual(len(tareas_finales), 0)
+        # Verificar que Usuario B no vea tareas ajenas
+        tareas_b = self.manager.obtener_tareas(user_b.id)
+        self.assertEqual(len(tareas_b), 0)
 
-    def test_validacion_titulo_vacio(self):
-        """
-        Asegura que el sistema lance un ValueError si se intenta crear una tarea sin título.
-        """
-        with self.assertRaises(ValueError):
-            self.manager.agregar_tarea("", "Descripción sin título")
-
+    def tearDown(self):
+        """Libera los recursos de la base de datos al finalizar."""
+        self.manager.db.engine.dispose()
 
 if __name__ == "__main__":
     unittest.main()

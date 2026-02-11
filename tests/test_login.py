@@ -1,70 +1,56 @@
 """
-Pruebas unitarias para el módulo de autenticación.
-Valida el registro de usuarios y la seguridad del inicio de sesión.
+Suite de pruebas para validacion de autenticacion.
+Ejecutar con: python -m unittest discover tests/
 """
-
-from src.logica.task_manager import TaskManager
 import unittest
-import sys
-import os
-
-# --- CONFIGURACIÓN DE RUTAS ---
-# Ajusta el path para permitir importaciones desde la carpeta 'src'
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(current_dir, '..'))
-sys.path.insert(0, root_dir)
+from src.logica.task_manager import TaskManager
+from src.modelo.modelo import Usuario
 
 
-class TestLogin(unittest.TestCase):
-    """
-    Suite de pruebas para validar el flujo de acceso.
-    Usa una base de datos temporal para garantizar pruebas limpias y aisladas.
-    """
-
+class TestAutenticacion(unittest.TestCase):
     def setUp(self):
-        """
-        Prepara el entorno creando una base de datos de prueba antes de cada test.
-        """
+        """Limpieza y preparacion de entorno de prueba."""
         self.manager = TaskManager()
-        self.manager.db_path = "test_login.db"
-        self.manager.inicializar_db()
+        # Usamos un correo específico para pruebas
+        self.correo = "test_autom@test.com"
+        self.clave = "clave123"
+        self.nombre = "Usuario Test"
 
-    def tearDown(self):
+        # Intentamos registrar. Si ya existe, no pasa nada 
+        self.manager.registrar_usuario(self.correo, self.clave, self.nombre)
+
+    def test_acceso_valido(self):
+        """Login exitoso debe devolver instancia de Usuario."""
+        res = self.manager.login(self.correo, self.clave)
+
+        self.assertIsNotNone(res)
+        self.assertIsInstance(res, Usuario)
+        self.assertEqual(res.email, self.correo)
+        # Verificamos que el nombre coincida
+        self.assertEqual(res.nombre, self.nombre)
+
+    def test_acceso_denegado_clave_incorrecta(self):
         """
-        Limpia el entorno eliminando el archivo de base de datos tras cada prueba.
+        NUEVO: Verifica que lance ValueError con el mensaje exacto
+        cuando la contraseña está mal.
         """
-        if os.path.exists("test_login.db"):
-            try:
-                os.remove("test_login.db")
-            except PermissionError:
-                pass
+        # "with self.assertRaises" atrapa el error para verificarlo
+        with self.assertRaises(ValueError) as contexto:
+            self.manager.login(self.correo, "clave_falsa_123")
 
-    def test_registro_y_login_exitoso(self):
+        # Verificamos que el mensaje del error sea el correcto
+        self.assertEqual(str(contexto.exception), "Contraseña incorrecta.")
+
+    def test_acceso_denegado_usuario_inexistente(self):
         """
-        Verifica que un usuario registrado pueda iniciar sesión con sus credenciales.
+        NUEVO: Verifica que lance ValueError cuando el correo no existe.
         """
-        self.manager.registrar_usuario(
-            "juan@test.com", "12345", "Juan", "Perez", "01/01/2000", "M"
-        )
+        with self.assertRaises(ValueError) as contexto:
+            self.manager.login("correo_fantasma@nada.com", "cualquier_clave")
 
-        user_id = self.manager.login("juan@test.com", "12345")
-
-        self.assertIsNotNone(
-            user_id, "El login falló con credenciales válidas")
-
-    def test_login_fallido_clave_incorrecta(self):
-        """
-        Comprueba que el sistema bloquee el acceso cuando la contraseña es errónea.
-        """
-        self.manager.registrar_usuario(
-            "maria@test.com", "54321", "Maria", "Gomez", "01/01/1990", "F"
-        )
-
-        user_id = self.manager.login("maria@test.com", "CLAVE_ERRONEA")
-
-        self.assertIsNone(
-            user_id, "El login no debería permitir el ingreso con clave incorrecta")
+        self.assertEqual(str(contexto.exception),
+                         "El correo no está registrado.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
