@@ -30,11 +30,16 @@ class Tarea(Base):
     id = Column(Integer, primary_key=True)
     titulo = Column(String, nullable=False)
     descripcion = Column(String)
+
+    # 🔹 NUEVOS CAMPOS (agregados)
+    fecha = Column(String)
+    prioridad = Column(String, default="Media")
     estado = Column(String, default='pendiente')
 
     # RELACIÓN: Clave foránea vinculada al usuario
     user_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
     usuario = relationship("Usuario", back_populates="tareas")
+
 
 
 class Database:
