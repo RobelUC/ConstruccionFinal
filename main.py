@@ -193,6 +193,38 @@ def main(page: ft.Page):
 
         lista = ft.Column(spacing=10)
 
+        # ---------- FUNCION GLOBAL PARA CERRAR DIALOGO ----------
+        def ver_descripcion(e, tarea):
+
+            dialogo = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(tarea["titulo"]),
+                content=ft.Column(
+                    tight=True,
+                    controls=[
+                        ft.Text("📌 Descripción:", weight=ft.FontWeight.BOLD),
+                        ft.Text(tarea.get("descripcion", "Sin descripción")),
+                        ft.Divider(),
+                        ft.Text("⭐ Prioridad:", weight=ft.FontWeight.BOLD),
+                        ft.Text(tarea.get("prioridad", "No definida")),
+                    ]
+                ),
+                actions=[
+                    ft.TextButton("Cerrar", on_click=lambda e: cerrar(dialogo))
+                ]
+            )
+
+            page.overlay.append(dialogo)   # 👈 ESTA ES LA CLAVE
+            dialogo.open = True
+            page.update()
+
+
+        def cerrar(dialogo):
+            dialogo.open = False
+            page.update()
+
+
+
         # ---------- RECARGAR LISTA ----------
         def cargar_tareas():
             lista.controls.clear()
@@ -200,13 +232,13 @@ def main(page: ft.Page):
             texto = buscador.value.strip().lower() if buscador.value else ""
 
             if texto:
-                # Filtrar por título o fecha
-                tareas = [t for t in manager.listar_tareas_usuario(usuario["id"])
-                        if texto in t["titulo"].lower() or texto in t.get("fecha", "").lower()]
+                tareas = [
+                    t for t in manager.listar_tareas_usuario(usuario["id"])
+                    if texto in t["titulo"].lower() or texto in t.get("fecha", "").lower()
+                ]
             else:
                 tareas = manager.listar_tareas_usuario(usuario["id"])
 
-            # Filtrado por dropdown
             if filtro.value == "Pendiente":
                 tareas = [t for t in tareas if t["estado"] == "pendiente"]
             elif filtro.value == "Completada":
@@ -215,7 +247,6 @@ def main(page: ft.Page):
             pendientes = [t for t in tareas if t["estado"] == "pendiente"]
             completadas = [t for t in tareas if t["estado"] == "completada"]
 
-            # ---------- CONTADOR ----------
             lista.controls.append(
                 ft.Text(
                     f"Total: {len(tareas)} | Pendientes: {len(pendientes)} | Completadas: {len(completadas)}",
@@ -229,20 +260,6 @@ def main(page: ft.Page):
             lista.controls.append(ft.Text("Pendientes", weight=ft.FontWeight.BOLD, size=18))
 
             for t in pendientes:
-                def ver_descripcion(e, tarea=t):
-                    page.dialog = ft.AlertDialog(
-                        title=ft.Text(tarea["titulo"]),
-                        content=ft.Text(tarea.get("descripcion", "Sin descripción")),
-                        actions=[ft.TextButton("Cerrar", on_click=lambda e: cerrar_dialogo())],
-                        modal=True
-                    )
-                    page.dialog.open = True
-                    page.update()
-
-                def cerrar_dialogo():
-                    page.dialog.open = False
-                    page.update()
-
                 lista.controls.append(
                     ft.Container(
                         padding=10,
@@ -265,8 +282,10 @@ def main(page: ft.Page):
                                                 ft.Text(f"Fecha: {t.get('fecha', 'Sin fecha')}", size=12, color=ft.colors.GREY_700),
                                                 ft.TextButton(
                                                     "Ver descripción",
-                                                    on_click=ver_descripcion,
-                                                    style=ft.ButtonStyle(text_style=ft.TextStyle(color=ft.colors.BLUE))
+                                                    on_click=lambda e, tarea=t: ver_descripcion(e, tarea),
+                                                    style=ft.ButtonStyle(
+                                                        text_style=ft.TextStyle(color=ft.colors.BLUE)
+                                                    )
                                                 )
                                             ]
                                         )
@@ -301,20 +320,6 @@ def main(page: ft.Page):
             lista.controls.append(ft.Text("Completadas", weight=ft.FontWeight.BOLD, size=18))
 
             for t in completadas:
-                def ver_descripcion(e, tarea=t):
-                    page.dialog = ft.AlertDialog(
-                        title=ft.Text(tarea["titulo"]),
-                        content=ft.Text(tarea.get("descripcion", "Sin descripción")),
-                        actions=[ft.TextButton("Cerrar", on_click=lambda e: cerrar_dialogo())],
-                        modal=True
-                    )
-                    page.dialog.open = True
-                    page.update()
-
-                def cerrar_dialogo():
-                    page.dialog.open = False
-                    page.update()
-
                 lista.controls.append(
                     ft.Container(
                         padding=10,
@@ -331,8 +336,10 @@ def main(page: ft.Page):
                                         ft.Text(f"Fecha: {t.get('fecha', 'Sin fecha')}", size=12, color=ft.colors.GREY_700),
                                         ft.TextButton(
                                             "Ver descripción",
-                                            on_click=ver_descripcion,
-                                            style=ft.ButtonStyle(text_style=ft.TextStyle(color=ft.colors.BLUE))
+                                            on_click=lambda e, tarea=t: ver_descripcion(e, tarea),
+                                            style=ft.ButtonStyle(
+                                                text_style=ft.TextStyle(color=ft.colors.BLUE)
+                                            )
                                         )
                                     ]
                                 )
@@ -368,11 +375,9 @@ def main(page: ft.Page):
         saludo = ft.Text(f"Hola, {usuario['nombre']} 👋")
         motivacion = ft.Text(random.choice(frases), color=ft.colors.PURPLE)
 
-        # ---------- EVENTOS ----------
         buscador.on_change = lambda e: cargar_tareas()
         filtro.on_change = lambda e: cargar_tareas()
 
-        # ---------- MOSTRAR ----------
         page.add(
             header,
             ft.Divider(),
@@ -392,10 +397,12 @@ def main(page: ft.Page):
 
         cargar_tareas()
 
-    # ---------------------------------------------------------
-    # CREAR TAREA
-    # ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# CREAR TAREA
+# ---------------------------------------------------------
     def mostrar_crear(usuario):
+
         page.clean()
         page.title = "Crear Tarea"
 
@@ -412,31 +419,42 @@ def main(page: ft.Page):
             ]
         )
 
+        mensaje = ft.Text("", color="red")
+
         def guardar(e):
+
+            # Limpiar errores previos
+            txt_titulo.error_text = None
+            txt_descripcion.error_text = None
+            txt_fecha.error_text = None
+            mensaje.value = ""
+
             titulo = txt_titulo.value.strip() if txt_titulo.value else ""
             descripcion = txt_descripcion.value.strip() if txt_descripcion.value else ""
             fecha = txt_fecha.value.strip() if txt_fecha.value else ""
 
+            error = False
+
             # Validaciones
             if not titulo:
-                page.snack_bar = ft.SnackBar(ft.Text("El título es obligatorio"))
-                page.snack_bar.open = True
-                page.update()
-                return
+                txt_titulo.error_text = "El título es obligatorio"
+                error = True
 
             if not descripcion:
-                page.snack_bar = ft.SnackBar(ft.Text("La descripción es obligatoria"))
-                page.snack_bar.open = True
-                page.update()
-                return
+                txt_descripcion.error_text = "La descripción es obligatoria"
+                error = True
 
             if not fecha:
-                page.snack_bar = ft.SnackBar(ft.Text("La fecha es obligatoria"))
-                page.snack_bar.open = True
+                txt_fecha.error_text = "La fecha es obligatoria"
+                error = True
+
+            if error:
+                mensaje.value = "Complete todos los campos obligatorios"
+                mensaje.color = "red"
                 page.update()
                 return
 
-            # Si pasa validación → guardar
+            # Guardar tarea
             manager.agregar_tarea_usuario(
                 user_id=usuario["id"],
                 titulo=titulo,
@@ -445,13 +463,36 @@ def main(page: ft.Page):
                 prioridad=prioridad.value
             )
 
-            page.snack_bar = ft.SnackBar(ft.Text("Tarea creada correctamente"))
-            page.snack_bar.open = True
+            # Mostrar mensaje de éxito
+            mensaje.value = "✅ La tarea fue creada correctamente"
+            mensaje.color = "green"
+
+            # Limpiar campos
+            txt_titulo.value = ""
+            txt_descripcion.value = ""
+            txt_fecha.value = ""
+            prioridad.value = "Media"
+
             page.update()
 
-            mostrar_tareas(usuario)
+        page.add(
+            ft.Text("Crear Tarea", size=22, weight="bold"),
+            txt_titulo,
+            txt_descripcion,
+            txt_fecha,
+            prioridad,
+            mensaje,
+            ft.Row(
+                [
+                    ft.ElevatedButton("Guardar", on_click=guardar),
+                    ft.TextButton("Cancelar", on_click=lambda e: mostrar_tareas(usuario))
+                ]
+            )
+        )
 
-   
+        page.update()
+
+
 
 # --------------------------------------------------------- 
 # EDITAR TAREA

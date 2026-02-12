@@ -166,17 +166,3 @@ class TaskManager:
             session.close()
 
 
-def test_tarea_tiene_descripcion_y_prioridad(manager, usuario_prueba):
-    # Crear tarea
-    manager.crear_tarea(
-        usuario_prueba["id"],
-        "Tarea prueba",
-        "Descripcion prueba",
-        "alta",
-        "2026-02-10"
-    )
-
-    tareas = manager.listar_tareas_usuario(usuario_prueba["id"])
-
-    assert tareas[0]["descripcion"] == "Descripcion prueba"
-    assert tareas[0]["prioridad"] == "alta"
