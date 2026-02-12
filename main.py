@@ -413,27 +413,44 @@ def main(page: ft.Page):
         )
 
         def guardar(e):
+            titulo = txt_titulo.value.strip() if txt_titulo.value else ""
+            descripcion = txt_descripcion.value.strip() if txt_descripcion.value else ""
+            fecha = txt_fecha.value.strip() if txt_fecha.value else ""
+
+            # Validaciones
+            if not titulo:
+                page.snack_bar = ft.SnackBar(ft.Text("El título es obligatorio"))
+                page.snack_bar.open = True
+                page.update()
+                return
+
+            if not descripcion:
+                page.snack_bar = ft.SnackBar(ft.Text("La descripción es obligatoria"))
+                page.snack_bar.open = True
+                page.update()
+                return
+
+            if not fecha:
+                page.snack_bar = ft.SnackBar(ft.Text("La fecha es obligatoria"))
+                page.snack_bar.open = True
+                page.update()
+                return
+
+            # Si pasa validación → guardar
             manager.agregar_tarea_usuario(
                 user_id=usuario["id"],
-                titulo=txt_titulo.value,
-                descripcion=txt_descripcion.value,
-                fecha=txt_fecha.value,
+                titulo=titulo,
+                descripcion=descripcion,
+                fecha=fecha,
                 prioridad=prioridad.value
             )
+
+            page.snack_bar = ft.SnackBar(ft.Text("Tarea creada correctamente"))
+            page.snack_bar.open = True
+            page.update()
+
             mostrar_tareas(usuario)
 
-        # 🔥 IMPORTANTE: ESTO VA FUERA DE GUARDAR
-        page.add(
-            ft.Text("Crear Tarea", size=22, weight="bold"),
-            txt_titulo,
-            txt_descripcion,
-            txt_fecha,
-            prioridad,
-            ft.ElevatedButton("Guardar", on_click=guardar),
-            ft.TextButton("Cancelar", on_click=lambda e: mostrar_tareas(usuario))
-        )
-
-        page.update()
    
 
 # --------------------------------------------------------- 
