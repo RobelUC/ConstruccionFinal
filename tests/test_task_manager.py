@@ -38,7 +38,7 @@ class TestTaskManager(unittest.TestCase):
 
         # Recuperar (Read)
         tareas = self.manager.listar_tareas_usuario(self.user["id"])
-        self.assertEqual(len(tareas), 99)
+        self.assertEqual(len(tareas), 1)
         self.assertEqual(tareas[0]["titulo"], titulo)
 
     def test_aislamiento_usuarios(self):
