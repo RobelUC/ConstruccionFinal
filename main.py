@@ -41,33 +41,35 @@ def main(page: ft.Page):
 
         email = ft.TextField(label="Correo Electrónico", width=280)
         password = ft.TextField(label="Contraseña", password=True, width=280)
+        
+        # --- NUEVA ETIQUETA DE ERROR ---
+        # Inicialmente oculta, se muestra solo si falla el login
+        txt_error = ft.Text("", color="red", visible=False, size=14, weight="bold")
 
         def cerrar_dialogo(e):
             page.dialog.open = False
             page.update()
 
         def funcion_entrar(e):
+            # Reiniciar estados de error
             email.error_text = None
             password.error_text = None
-            page.dialog = None
+            txt_error.visible = False
             page.update()
 
             try:
                 usuario = manager.login(email.value, password.value)
+                
+                # Si el manager devuelve None (usuario no encontrado) y no lanza error:
+                if not usuario:
+                     raise ValueError("Correo o contraseña incorrectos")
+
                 mostrar_tareas(usuario)
 
             except ValueError as err:
-                alerta = ft.AlertDialog(
-                    modal=True,
-                    title=ft.Text("⚠️ Error de Acceso"),
-                    content=ft.Text(str(err)),
-                    actions=[
-                        ft.TextButton("Entendido", on_click=cerrar_dialogo)
-                    ],
-                )
-
-                page.dialog = alerta
-                alerta.open = True
+                # --- AQUÍ SE ACTIVA LA ETIQUETA ---
+                txt_error.value = f"⚠️ {str(err)}"
+                txt_error.visible = True
                 page.update()
 
             except Exception:
@@ -83,6 +85,8 @@ def main(page: ft.Page):
                     ft.Container(height=20),
                     email,
                     password,
+                    # Agregamos la etiqueta de error al diseño
+                    txt_error,
                     ft.Container(height=20),
                     ft.ElevatedButton("INGRESAR", on_click=funcion_entrar, width=280),
                     ft.TextButton("Crear cuenta nueva", on_click=lambda e: mostrar_registro())
@@ -144,7 +148,7 @@ def main(page: ft.Page):
         page.add(
             ft.Column(
                 [
-                    ft.Text("📝", size=60), # TUS ICONOS ORIGINALES
+                    ft.Text("📝", size=60), 
                     ft.Text("Crear Cuenta", size=25, weight="bold"),
                     txt_nombre, txt_apellido, txt_email, txt_pass, txt_fecha, dd_genero,
                     ft.Container(height=10),
@@ -387,10 +391,6 @@ def main(page: ft.Page):
         )
 
         cargar_tareas()
-
-
-
-                
 
     # ---------------------------------------------------------
     # CREAR TAREA
