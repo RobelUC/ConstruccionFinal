@@ -1,256 +1,79 @@
-"""
-Pruebas de integración para el CRUD de tareas.
-Verifica la vinculación de registros con usuarios y la integridad de los datos.
-"""
 import unittest
 import os
 from src.logica.task_manager import TaskManager
-from src.modelo.modelo import Tarea
 
 class TestTaskManager(unittest.TestCase):
     def setUp(self):
-        """
-        Prepara el entorno de pruebas.
-        Reinicia la base de datos para asegurar un estado limpio en cada ejecución.
-        """
+        """Prepara un entorno limpio para cada test."""
         self.manager = TaskManager()
-
-        # Liberar conexión previa para evitar bloqueos de archivo en Windows
+        
+        # 1. Limpieza de seguridad para Windows
         self.manager.db.engine.dispose()
-
-        # Eliminar base de datos anterior si existe
         if os.path.exists(self.manager.db.db_path):
             try:
                 os.remove(self.manager.db.db_path)
             except PermissionError:
                 pass
 
-        # Inicializar tablas limpias
+        # 2. Inicializar base de datos nueva
         self.manager.db.inicializar_db()
 
-        # Crear usuario base para las pruebas
+        # 3. Usuario de prueba (Login devuelve diccionario)
         self.email_test = "tester@proyect.com"
         self.manager.registrar_usuario(self.email_test, "clave123", "User Test")
         self.user = self.manager.login(self.email_test, "clave123")
 
-    def test_flujo_completo_tarea(self):
-        """Prueba la creación y recuperación de tareas vinculadas al usuario."""
-        titulo = "Test de SQLAlchemy"
-        descripcion = "Verificar relaciones 1:N"
+    def tearDown(self):
+        """Limpia los recursos después de cada test."""
+        self.manager.db.engine.dispose()
 
-        # 1. Agregar tarea
-        exito = self.manager.agregar_tarea(self.user.id, titulo, descripcion)
+    def test_flujo_completo_tarea(self):
+        """C-R: Crear y listar tareas del usuario."""
+        titulo = "Tarea 1"
+        desc = "Descripcion 1"
+        
+        # Agregar (Create)
+        exito = self.manager.agregar_tarea_usuario(self.user["id"], titulo, desc)
         self.assertTrue(exito)
 
-        # 2. Recuperar tareas
-        tareas = self.manager.obtener_tareas(self.user.id)
-        
-        # 3. Validaciones
-        self.assertEqual(len(tareas), 1)
-        self.assertIsInstance(tareas[0], Tarea)
-        self.assertEqual(tareas[0].titulo, titulo)
-        self.assertEqual(tareas[0].user_id, self.user.id)
+        # Recuperar (Read)
+        tareas = self.manager.listar_tareas_usuario(self.user["id"])
+        self.assertEqual(len(tareas), 99)
+        self.assertEqual(tareas[0]["titulo"], titulo)
 
-    def test_separacion_de_datos(self):
-        """Asegura que un usuario no pueda ver las tareas de otro."""
+    def test_aislamiento_usuarios(self):
+        """Asegura que un usuario no vea las tareas de otro."""
         # Usuario A crea tarea
-        self.manager.agregar_tarea(self.user.id, "Tarea Privada", "...")
+        self.manager.agregar_tarea_usuario(self.user["id"], "Privada A", "Solo A")
 
         # Usuario B se registra y loguea
         self.manager.registrar_usuario("otro@test.com", "456", "Otro")
         user_b = self.manager.login("otro@test.com", "456")
 
-        # Verificar que Usuario B no vea tareas ajenas
-        tareas_b = self.manager.obtener_tareas(user_b.id)
-        self.assertEqual(len(tareas_b), 0)
-
-    def tearDown(self):
-        """Libera los recursos de la base de datos al finalizar."""
-        self.manager.db.engine.dispose()
-    
-    def test_creacion_y_recuperacion_tareas(self):
-        """Verifica que se pueden crear y recuperar tareas correctamente."""
-        casos = [
-            {"titulo": "Tarea 1", "descripcion": "Descripcion 1"},
-            {"titulo": "Tarea 2", "descripcion": "Descripcion 2"},
-            {"titulo": "Tarea 3", "descripcion": "Descripcion 3"},
-        ]
-
-        for caso in casos:
-            with self.subTest(titulo=caso["titulo"]):
-                exito = self.manager.agregar_tarea_usuario(
-                    user_id=self.user["id"],
-                    titulo=caso["titulo"],
-                    descripcion=caso["descripcion"]
-                )
-                self.assertTrue(exito)
-
-        # Recuperar tareas
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(len(tareas), len(casos))
-
-        # Validar contenido
-        titulos_recuperados = [t.titulo for t in tareas]
-        for caso in casos:
-            self.assertIn(caso["titulo"], titulos_recuperados)
-
-    def test_aislamiento_usuarios(self):
-        """Verifica que un usuario no vea las tareas de otro."""
-        # Usuario A crea tarea
-        self.manager.agregar_tarea_usuario(self.user["id"], "Privada A", "Solo A")
-
-        # Usuario B
-        self.manager.registrar_usuario("otro@test.com", "456", "Otro")
-        user_b = self.manager.login("otro@test.com", "456")
-
-        tareas_b = self.manager.obtener_tareas(user_b["id"])
+        # Verificar que Usuario B vea 0 tareas
+        tareas_b = self.manager.listar_tareas_usuario(user_b["id"])
         self.assertEqual(len(tareas_b), 0)
 
     def test_estado_completado(self):
-        """Verifica marcar tareas como completadas y pendientes."""
-        self.manager.agregar_tarea_usuario(self.user["id"], "Estado", "Pendiente")
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        tarea = tareas[0]
+        """U: Verifica el cambio de estado (Pendiente <-> Completada)."""
+        self.manager.agregar_tarea_usuario(self.user["id"], "Estado", "Test")
+        
+        # Obtener el ID de la tarea creada
+        tareas = self.manager.listar_tareas_usuario(self.user["id"])
+        tarea_id = tareas[0]["id"]
 
-        # Inicialmente pendiente
-        self.assertEqual(tarea.estado, "pendiente")
+        # Inicialmente debe ser pendiente
+        self.assertEqual(tareas[0]["estado"], "pendiente")
 
-        # Cambiar estado a completada
-        self.manager.marcar_completada(tarea.id)
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(tareas[0].estado, "completada")
+        # Marcar como completada
+        self.manager.marcar_completada(tarea_id)
+        tareas_updated = self.manager.listar_tareas_usuario(self.user["id"])
+        self.assertEqual(tareas_updated[0]["estado"], "completada")
 
-        # Volver a pendiente
-        self.manager.marcar_completada(tarea.id)
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(tareas[0].estado, "pendiente")
-
-    def tearDown(self):
-        """Cerrar conexión de DB."""
-        self.manager.db.engine.dispose()
-
-    def test_creacion_y_recuperacion_tareas(self):
-        """Verifica que se pueden crear y recuperar tareas correctamente."""
-        casos = [
-            {"titulo": "Tarea 1", "descripcion": "Descripcion 1"},
-            {"titulo": "Tarea 2", "descripcion": "Descripcion 2"},
-            {"titulo": "Tarea 3", "descripcion": "Descripcion 3"},
-        ]
-
-        for caso in casos:
-            with self.subTest(titulo=caso["titulo"]):
-                exito = self.manager.agregar_tarea_usuario(
-                    user_id=self.user["id"],
-                    titulo=caso["titulo"],
-                    descripcion=caso["descripcion"]
-                )
-                self.assertTrue(exito)
-
-        # Recuperar tareas
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(len(tareas), len(casos))
-
-        # Validar contenido
-        titulos_recuperados = [t.titulo for t in tareas]
-        for caso in casos:
-            self.assertIn(caso["titulo"], titulos_recuperados)
-
-    def test_aislamiento_usuarios(self):
-        """Verifica que un usuario no vea las tareas de otro."""
-        # Usuario A crea tarea
-        self.manager.agregar_tarea_usuario(self.user["id"], "Privada A", "Solo A")
-
-        # Usuario B
-        self.manager.registrar_usuario("otro@test.com", "456", "Otro")
-        user_b = self.manager.login("otro@test.com", "456")
-
-        tareas_b = self.manager.obtener_tareas(user_b["id"])
-        self.assertEqual(len(tareas_b), 0)
-
-    def test_estado_completado(self):
-        """Verifica marcar tareas como completadas y pendientes."""
-        self.manager.agregar_tarea_usuario(self.user["id"], "Estado", "Pendiente")
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        tarea = tareas[0]
-
-        # Inicialmente pendiente
-        self.assertEqual(tarea.estado, "pendiente")
-
-        # Cambiar estado a completada
-        self.manager.marcar_completada(tarea.id)
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(tareas[0].estado, "completada")
-
-        # Volver a pendiente
-        self.manager.marcar_completada(tarea.id)
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(tareas[0].estado, "pendiente")
-
-    def tearDown(self):
-        """Cerrar conexión de DB."""
-        self.manager.db.engine.dispose()
-
-def test_creacion_y_recuperacion_tareas(self):
-        """Verifica que se pueden crear y recuperar tareas correctamente."""
-        casos = [
-            {"titulo": "Tarea 1", "descripcion": "Descripcion 1"},
-            {"titulo": "Tarea 2", "descripcion": "Descripcion 2"},
-            {"titulo": "Tarea 3", "descripcion": "Descripcion 3"},
-        ]
-
-        for caso in casos:
-            with self.subTest(titulo=caso["titulo"]):
-                exito = self.manager.agregar_tarea_usuario(
-                    user_id=self.user["id"],
-                    titulo=caso["titulo"],
-                    descripcion=caso["descripcion"]
-                )
-                self.assertTrue(exito)
-
-        # Recuperar tareas
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(len(tareas), len(casos))
-
-        # Validar contenido
-        titulos_recuperados = [t.titulo for t in tareas]
-        for caso in casos:
-            self.assertIn(caso["titulo"], titulos_recuperados)
-
-        def test_aislamiento_usuarios(self):
-            """Verifica que un usuario no vea las tareas de otro."""
-        # Usuario A crea tarea
-        self.manager.agregar_tarea_usuario(self.user["id"], "Privada A", "Solo A")
-
-        # Usuario B
-        self.manager.registrar_usuario("otro@test.com", "456", "Otro")
-        user_b = self.manager.login("otro@test.com", "456")
-
-        tareas_b = self.manager.obtener_tareas(user_b["id"])
-        self.assertEqual(len(tareas_b), 0)
-
-        def test_estado_completado(self):
-            """Verifica marcar tareas como completadas y pendientes."""
-        self.manager.agregar_tarea_usuario(self.user["id"], "Estado", "Pendiente")
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        tarea = tareas[0]
-
-        # Inicialmente pendiente
-        self.assertEqual(tarea.estado, "pendiente")
-
-        # Cambiar estado a completada
-        self.manager.marcar_completada(tarea.id)
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(tareas[0].estado, "completada")
-
-        # Volver a pendiente
-        self.manager.marcar_completada(tarea.id)
-        tareas = self.manager.obtener_tareas(self.user["id"])
-        self.assertEqual(tareas[0].estado, "pendiente")
-
-        def tearDown(self):
-            """Cerrar conexión de DB."""
-            self.manager.db.engine.dispose()
-
+        # Volver a pendiente (Toggle)
+        self.manager.marcar_completada(tarea_id)
+        tareas_back = self.manager.listar_tareas_usuario(self.user["id"])
+        self.assertEqual(tareas_back[0]["estado"], "pendiente")
 
 if __name__ == "__main__":
     unittest.main()

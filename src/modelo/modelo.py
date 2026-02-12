@@ -41,7 +41,6 @@ class Tarea(Base):
     usuario = relationship("Usuario", back_populates="tareas")
 
 
-
 class Database:
     """
     Configura la conexión ORM y la creación automática de tablas.
