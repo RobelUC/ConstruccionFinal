@@ -173,7 +173,7 @@ def main(page: ft.Page):
         page.bgcolor = ft.colors.WHITE
 
         frases = [
-            "La disciplina supera la motivación 🔥",
+            "La disciplina supera la motivación ",
             "Hoy es un gran día para avanzar 💡",
             "Pequeños pasos, grandes resultados 🚀"
         ]
@@ -191,7 +191,11 @@ def main(page: ft.Page):
             ]
         )
 
-        lista = ft.Column(spacing=10)
+        lista = ft.Column(
+            spacing=10,
+            expand=True,
+            scroll=ft.ScrollMode.AUTO
+        )
 
         # ---------- FUNCION GLOBAL PARA CERRAR DIALOGO ----------
         def ver_descripcion(e, tarea):
@@ -231,21 +235,28 @@ def main(page: ft.Page):
 
             texto = buscador.value.strip().lower() if buscador.value else ""
 
-            if texto:
-                tareas = [
-                    t for t in manager.listar_tareas_usuario(usuario["id"])
-                    if texto in t["titulo"].lower() or texto in t.get("fecha", "").lower()
-                ]
-            else:
-                tareas = manager.listar_tareas_usuario(usuario["id"])
+            estado = None
 
             if filtro.value == "Pendiente":
-                tareas = [t for t in tareas if t["estado"] == "pendiente"]
+                estado = "pendiente"
             elif filtro.value == "Completada":
-                tareas = [t for t in tareas if t["estado"] == "completada"]
+                estado = "completada"
+
+            tareas = manager.filtrar_tareas_usuario(usuario["id"], estado)
+
+            if texto:
+                tareas = [
+                    t for t in tareas
+                    if texto in t["titulo"].lower() or texto in t.get("fecha", "").lower()
+                ]
 
             pendientes = [t for t in tareas if t["estado"] == "pendiente"]
             completadas = [t for t in tareas if t["estado"] == "completada"]
+
+            if filtro.value == "Pendiente":
+                completadas = []
+            elif filtro.value == "Completada":
+                pendientes = []
 
             lista.controls.append(
                 ft.Text(

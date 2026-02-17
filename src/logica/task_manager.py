@@ -37,14 +37,14 @@ class TaskManager:
             user = session.query(Usuario).filter_by(email=email).first()
 
             if not user:
-                # 🛑 IMPORTANTE: 'raise' envía el error a la pantalla
+                # IMPORTANTE: 'raise' envía el error a la pantalla
                 raise ValueError("El correo no existe.")
 
             # Tu lógica de hash...
             pw_hash = hashlib.sha256(password.encode()).hexdigest()
             
             if user.password != pw_hash:
-                # 🛑 IMPORTANTE: 'raise' envía el error a la pantalla
+                # IMPORTANTE: 'raise' envía el error a la pantalla
                 raise ValueError("Contraseña incorrecta.")
 
             return {
@@ -54,7 +54,7 @@ class TaskManager:
             }
 
         except ValueError as e:
-            # 🛑 ESTO ES LO QUE TE FALTA:
+            # ESTO ES LO QUE TE FALTA:
             # Si capturas el error, tienes que volver a lanzarlo (raise)
             # para que main.py se entere.
             raise e 
@@ -165,4 +165,28 @@ class TaskManager:
         finally:
             session.close()
 
+
+    def filtrar_tareas_usuario(self, user_id, estado=None):
+        session = self.Session()
+        try:
+            query = session.query(Tarea).filter_by(user_id=user_id)
+
+            if estado:
+                query = query.filter_by(estado=estado)
+
+            tareas = query.all()
+
+            return [
+                {
+                    "id": t.id,
+                    "titulo": t.titulo,
+                    "descripcion": t.descripcion or "",
+                    "fecha": t.fecha or "Sin fecha",
+                    "prioridad": t.prioridad,
+                    "estado": t.estado
+                }
+                for t in tareas
+            ]
+        finally:
+            session.close()
 
