@@ -1,79 +1,160 @@
+"""
+Módulo de pruebas unitarias para la gestión de tareas (CRUD, filtros y búsqueda).
+"""
+
 import unittest
-import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from src.logica.task_manager import TaskManager
 
+# Importación de Base gestionando posibles diferencias de estructura de carpetas
+try:
+    from src.logica.orm import Base
+except ImportError:
+    from src.modelo.modelo import Base
+
+
 class TestTaskManager(unittest.TestCase):
+    """
+    Suite de pruebas para validar la lógica de negocio de TaskManager.
+    """
+
     def setUp(self):
-        """Prepara un entorno limpio para cada test."""
-        self.manager = TaskManager()
-        
-        # 1. Limpieza de seguridad para Windows
-        self.manager.db.engine.dispose()
-        if os.path.exists(self.manager.db.db_path):
-            try:
-                os.remove(self.manager.db.db_path)
-            except PermissionError:
-                pass
+        """
+        Configuración de base de datos temporal y entorno de prueba.
+        Inyecta una base de datos física para permitir la depuración posterior.
+        """
+        from src.modelo.modelo import Database, Base
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
-        # 2. Inicializar base de datos nueva
-        self.manager.db.inicializar_db()
+        # 1. Instancia de base de datos para pruebas
+        test_db = Database()
 
-        # 3. Usuario de prueba (Login devuelve diccionario)
+        # 2. Uso de archivo físico para depuración (test_debug.db)
+        self.test_engine = create_engine('sqlite:///test_debug.db')
+
+        test_db.engine = self.test_engine
+        test_db.Session = sessionmaker(bind=self.test_engine)
+
+        # 3. Reconstrucción de esquema de tablas
+        Base.metadata.drop_all(self.test_engine)
+        Base.metadata.create_all(self.test_engine)
+
+        # 4. Inyección de dependencia al manager
+        self.manager = TaskManager(db_instance=test_db)
+
+        # 5. Creación de sesión de usuario para las pruebas
         self.email_test = "tester@proyect.com"
-        self.manager.registrar_usuario(self.email_test, "clave123", "User Test")
+        self.manager.registrar_usuario(
+            self.email_test, "clave123", "User Test")
         self.user = self.manager.login(self.email_test, "clave123")
 
     def tearDown(self):
-        """Limpia los recursos después de cada test."""
+        """
+        Finalización de la prueba y liberación de recursos del motor.
+        """
         self.manager.db.engine.dispose()
 
-    def test_flujo_completo_tarea(self):
-        """C-R: Crear y listar tareas del usuario."""
-        titulo = "Tarea 1"
-        desc = "Descripcion 1"
-        
-        # Agregar (Create)
-        exito = self.manager.agregar_tarea_usuario(self.user["id"], titulo, desc)
-        self.assertTrue(exito)
+    def test_flujo_basico(self):
+        """
+        Prueba la creación de una tarea y su recuperación mediante el listado.
+        """
+        titulo = "Tarea Básica"
+        self.manager.agregar_tarea_usuario(self.user["id"], titulo, "Desc")
 
-        # Recuperar (Read)
         tareas = self.manager.listar_tareas_usuario(self.user["id"])
         self.assertEqual(len(tareas), 1)
         self.assertEqual(tareas[0]["titulo"], titulo)
 
     def test_aislamiento_usuarios(self):
-        """Asegura que un usuario no vea las tareas de otro."""
-        # Usuario A crea tarea
-        self.manager.agregar_tarea_usuario(self.user["id"], "Privada A", "Solo A")
+        """
+        Valida que los usuarios solo puedan acceder a sus propias tareas.
+        """
+        self.manager.agregar_tarea_usuario(self.user["id"], "Secreto", "X")
 
-        # Usuario B se registra y loguea
-        self.manager.registrar_usuario("otro@test.com", "456", "Otro")
-        user_b = self.manager.login("otro@test.com", "456")
+        self.manager.registrar_usuario("intruso@test.com", "456", "Intruso")
+        user_b = self.manager.login("intruso@test.com", "456")
 
-        # Verificar que Usuario B vea 0 tareas
         tareas_b = self.manager.listar_tareas_usuario(user_b["id"])
         self.assertEqual(len(tareas_b), 0)
 
-    def test_estado_completado(self):
-        """U: Verifica el cambio de estado (Pendiente <-> Completada)."""
-        self.manager.agregar_tarea_usuario(self.user["id"], "Estado", "Test")
-        
-        # Obtener el ID de la tarea creada
+    def test_marcar_completada(self):
+        """
+        Verifica el cambio de estado (toggle) de una tarea.
+        """
+        self.manager.agregar_tarea_usuario(
+            self.user["id"], "Test Estado", "Desc")
         tareas = self.manager.listar_tareas_usuario(self.user["id"])
-        tarea_id = tareas[0]["id"]
+        id_tarea = tareas[0]["id"]
 
-        # Inicialmente debe ser pendiente
-        self.assertEqual(tareas[0]["estado"], "pendiente")
+        # Cambio a completada
+        self.manager.marcar_completada(id_tarea)
+        t_upd = self.manager.listar_tareas_usuario(self.user["id"])
+        self.assertEqual(t_upd[0]["estado"], "completada")
 
-        # Marcar como completada
-        self.manager.marcar_completada(tarea_id)
-        tareas_updated = self.manager.listar_tareas_usuario(self.user["id"])
-        self.assertEqual(tareas_updated[0]["estado"], "completada")
+        # Regreso a pendiente
+        self.manager.marcar_completada(id_tarea)
+        t_back = self.manager.listar_tareas_usuario(self.user["id"])
+        self.assertEqual(t_back[0]["estado"], "pendiente")
 
-        # Volver a pendiente (Toggle)
-        self.manager.marcar_completada(tarea_id)
-        tareas_back = self.manager.listar_tareas_usuario(self.user["id"])
-        self.assertEqual(tareas_back[0]["estado"], "pendiente")
+    def test_edicion_y_eliminacion(self):
+        """
+        Valida la actualización de campos de una tarea y su posterior borrado.
+        """
+        # Creación inicial
+        self.manager.agregar_tarea_usuario(
+            self.user["id"], "Original", "Original Desc")
+        tareas = self.manager.listar_tareas_usuario(self.user["id"])
+        id_tarea = tareas[0]["id"]
+
+        # Operación de edición
+        self.manager.editar_tarea(
+            id_tarea, "Titulo Nuevo", "Desc Nueva", "2025-01-01", "Alta")
+
+        tareas_editadas = self.manager.listar_tareas_usuario(self.user["id"])
+        self.assertEqual(tareas_editadas[0]["titulo"], "Titulo Nuevo")
+        self.assertEqual(tareas_editadas[0]["prioridad"], "Alta")
+
+        # Operación de eliminación
+        self.manager.eliminar_tarea(id_tarea)
+
+        tareas_finales = self.manager.listar_tareas_usuario(self.user["id"])
+        self.assertEqual(len(tareas_finales), 0)
+
+    def test_busqueda_y_filtros(self):
+        """
+        Prueba las funcionalidades de búsqueda por texto y filtrado por estado.
+        """
+        # Preparación de datos
+        self.manager.agregar_tarea_usuario(
+            self.user["id"], "Aprender Python", "Estudio")
+        self.manager.agregar_tarea_usuario(
+            self.user["id"], "Comprar Pan", "Casa")
+        self.manager.agregar_tarea_usuario(
+            self.user["id"], "Hacer Ejercicio", "Salud")
+
+        # Completar una tarea para el filtro
+        tareas = self.manager.listar_tareas_usuario(self.user["id"])
+        for t in tareas:
+            if t["titulo"] == "Hacer Ejercicio":
+                self.manager.marcar_completada(t["id"])
+
+        # Validación de búsqueda
+        res_busqueda = self.manager.buscar_tareas(self.user["id"], "Python")
+        self.assertEqual(len(res_busqueda), 1)
+        self.assertEqual(res_busqueda[0]["titulo"], "Aprender Python")
+
+        # Validación de filtros de estado
+        completadas = self.manager.filtrar_tareas_usuario(
+            self.user["id"], estado="completada")
+        self.assertEqual(len(completadas), 1)
+        self.assertEqual(completadas[0]["titulo"], "Hacer Ejercicio")
+
+        pendientes = self.manager.filtrar_tareas_usuario(
+            self.user["id"], estado="pendiente")
+        self.assertEqual(len(pendientes), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

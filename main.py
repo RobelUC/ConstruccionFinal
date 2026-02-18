@@ -3,6 +3,7 @@ Interfaz gráfica del Gestor de Tareas desarrollada con Flet.
 Maneja la visualización de pantallas, la comunicación con el controlador y el feedback de errores.
 """
 
+from src.logica.task_manager import TaskManager
 import flet as ft
 import sys
 import os
@@ -16,8 +17,6 @@ if not hasattr(ft, "colors"):
 # --- CONFIGURACIÓN DE RUTAS ---
 sys.path.append(os.path.abspath(
     os.path.join(os.path.dirname(__file__), 'src')))
-
-from src.logica.task_manager import TaskManager
 
 
 def main(page: ft.Page):
@@ -41,10 +40,11 @@ def main(page: ft.Page):
 
         email = ft.TextField(label="Correo Electrónico", width=280)
         password = ft.TextField(label="Contraseña", password=True, width=280)
-        
+
         # --- NUEVA ETIQUETA DE ERROR ---
         # Inicialmente oculta, se muestra solo si falla el login
-        txt_error = ft.Text("", color="red", visible=False, size=14, weight="bold")
+        txt_error = ft.Text("", color="red", visible=False,
+                            size=14, weight="bold")
 
         def cerrar_dialogo(e):
             page.dialog.open = False
@@ -59,10 +59,10 @@ def main(page: ft.Page):
 
             try:
                 usuario = manager.login(email.value, password.value)
-                
+
                 # Si el manager devuelve None (usuario no encontrado) y no lanza error:
                 if not usuario:
-                     raise ValueError("Correo o contraseña incorrectos")
+                    raise ValueError("Correo o contraseña incorrectos")
 
                 mostrar_tareas(usuario)
 
@@ -88,8 +88,10 @@ def main(page: ft.Page):
                     # Agregamos la etiqueta de error al diseño
                     txt_error,
                     ft.Container(height=20),
-                    ft.ElevatedButton("INGRESAR", on_click=funcion_entrar, width=280),
-                    ft.TextButton("Crear cuenta nueva", on_click=lambda e: mostrar_registro())
+                    ft.ElevatedButton(
+                        "INGRESAR", on_click=funcion_entrar, width=280),
+                    ft.TextButton("Crear cuenta nueva",
+                                  on_click=lambda e: mostrar_registro())
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER
@@ -148,7 +150,7 @@ def main(page: ft.Page):
         page.add(
             ft.Column(
                 [
-                    ft.Text("📝", size=60), 
+                    ft.Text("📝", size=60),
                     ft.Text("Crear Cuenta", size=25, weight="bold"),
                     txt_nombre, txt_apellido, txt_email, txt_pass, txt_fecha, dd_genero,
                     ft.Container(height=10),
@@ -163,7 +165,7 @@ def main(page: ft.Page):
         )
         page.update()
 
-# --------------------------------------------------------- 
+# ---------------------------------------------------------
 # LISTAR TAREAS (VERSIÓN MEJORADA Y MEJORADA)
 # ---------------------------------------------------------
     def mostrar_tareas(usuario):
@@ -178,7 +180,8 @@ def main(page: ft.Page):
             "Pequeños pasos, grandes resultados 🚀"
         ]
 
-        buscador = ft.TextField(label="Buscar tarea", width=300, hint_text="Buscar por título o fecha")
+        buscador = ft.TextField(
+            label="Buscar tarea", width=300, hint_text="Buscar por título o fecha")
 
         filtro = ft.Dropdown(
             label="Filtrar por estado",
@@ -222,14 +225,12 @@ def main(page: ft.Page):
             dialogo.open = True
             page.update()
 
-
         def cerrar(dialogo):
             dialogo.open = False
             page.update()
 
-
-
         # ---------- RECARGAR LISTA ----------
+
         def cargar_tareas():
             lista.controls.clear()
 
@@ -268,7 +269,8 @@ def main(page: ft.Page):
             lista.controls.append(ft.Divider())
 
             # ---------- PENDIENTES ----------
-            lista.controls.append(ft.Text("Pendientes", weight=ft.FontWeight.BOLD, size=18))
+            lista.controls.append(
+                ft.Text("Pendientes", weight=ft.FontWeight.BOLD, size=18))
 
             for t in pendientes:
                 lista.controls.append(
@@ -284,18 +286,23 @@ def main(page: ft.Page):
                                     controls=[
                                         ft.Checkbox(
                                             value=False,
-                                            on_change=lambda e, id=t["id"]: cambiar_estado(id)
+                                            on_change=lambda e, id=t["id"]: cambiar_estado(
+                                                id)
                                         ),
                                         ft.Column(
                                             spacing=2,
                                             controls=[
-                                                ft.Text(t["titulo"], weight=ft.FontWeight.BOLD, size=14),
-                                                ft.Text(f"Fecha: {t.get('fecha', 'Sin fecha')}", size=12, color=ft.colors.GREY_700),
+                                                ft.Text(
+                                                    t["titulo"], weight=ft.FontWeight.BOLD, size=14),
+                                                ft.Text(
+                                                    f"Fecha: {t.get('fecha', 'Sin fecha')}", size=12, color=ft.colors.GREY_700),
                                                 ft.TextButton(
                                                     "Ver descripción",
-                                                    on_click=lambda e, tarea=t: ver_descripcion(e, tarea),
+                                                    on_click=lambda e, tarea=t: ver_descripcion(
+                                                        e, tarea),
                                                     style=ft.ButtonStyle(
-                                                        text_style=ft.TextStyle(color=ft.colors.BLUE)
+                                                        text_style=ft.TextStyle(
+                                                            color=ft.colors.BLUE)
                                                     )
                                                 )
                                             ]
@@ -309,7 +316,8 @@ def main(page: ft.Page):
                                             "✏️",
                                             width=40,
                                             height=40,
-                                            on_click=lambda e, tarea=t: mostrar_editar(usuario, tarea)
+                                            on_click=lambda e, tarea=t: mostrar_editar(
+                                                usuario, tarea)
                                         ),
                                         ft.ElevatedButton(
                                             "❌",
@@ -317,7 +325,8 @@ def main(page: ft.Page):
                                             color=ft.colors.WHITE,
                                             width=40,
                                             height=40,
-                                            on_click=lambda e, id=t["id"]: eliminar(id)
+                                            on_click=lambda e, id=t["id"]: eliminar(
+                                                id)
                                         )
                                     ]
                                 )
@@ -328,7 +337,8 @@ def main(page: ft.Page):
 
             # ---------- COMPLETADAS ----------
             lista.controls.append(ft.Divider())
-            lista.controls.append(ft.Text("Completadas", weight=ft.FontWeight.BOLD, size=18))
+            lista.controls.append(
+                ft.Text("Completadas", weight=ft.FontWeight.BOLD, size=18))
 
             for t in completadas:
                 lista.controls.append(
@@ -343,13 +353,17 @@ def main(page: ft.Page):
                                 ft.Column(
                                     spacing=2,
                                     controls=[
-                                        ft.Text(t["titulo"], size=14, italic=True),
-                                        ft.Text(f"Fecha: {t.get('fecha', 'Sin fecha')}", size=12, color=ft.colors.GREY_700),
+                                        ft.Text(t["titulo"], size=14,
+                                                italic=True),
+                                        ft.Text(
+                                            f"Fecha: {t.get('fecha', 'Sin fecha')}", size=12, color=ft.colors.GREY_700),
                                         ft.TextButton(
                                             "Ver descripción",
-                                            on_click=lambda e, tarea=t: ver_descripcion(e, tarea),
+                                            on_click=lambda e, tarea=t: ver_descripcion(
+                                                e, tarea),
                                             style=ft.ButtonStyle(
-                                                text_style=ft.TextStyle(color=ft.colors.BLUE)
+                                                text_style=ft.TextStyle(
+                                                    color=ft.colors.BLUE)
                                             )
                                         )
                                     ]
@@ -412,6 +426,7 @@ def main(page: ft.Page):
 # ---------------------------------------------------------
 # CREAR TAREA
 # ---------------------------------------------------------
+
     def mostrar_crear(usuario):
 
         page.clean()
@@ -496,7 +511,8 @@ def main(page: ft.Page):
             ft.Row(
                 [
                     ft.ElevatedButton("Guardar", on_click=guardar),
-                    ft.TextButton("Cancelar", on_click=lambda e: mostrar_tareas(usuario))
+                    ft.TextButton(
+                        "Cancelar", on_click=lambda e: mostrar_tareas(usuario))
                 ]
             )
         )
@@ -504,18 +520,20 @@ def main(page: ft.Page):
         page.update()
 
 
-
-# --------------------------------------------------------- 
+# ---------------------------------------------------------
 # EDITAR TAREA
 # ---------------------------------------------------------
+
     def mostrar_editar(usuario, tarea):
         page.clean()
         page.title = "Editar Tarea"
 
         # Cambiar .titulo -> ["titulo"], .descripcion -> ["descripcion"], etc.
         titulo = ft.TextField(label="Título", value=tarea["titulo"])
-        descripcion = ft.TextField(label="Descripción", value=tarea["descripcion"], multiline=True)
-        fecha = ft.TextField(label="Fecha", value=tarea.get("fecha", ""))  # .get para evitar error si no hay fecha
+        descripcion = ft.TextField(
+            label="Descripción", value=tarea["descripcion"], multiline=True)
+        # .get para evitar error si no hay fecha
+        fecha = ft.TextField(label="Fecha", value=tarea.get("fecha", ""))
         prioridad = ft.Dropdown(
             label="Prioridad",
             value=tarea.get("prioridad", "Media"),
@@ -544,11 +562,11 @@ def main(page: ft.Page):
             fecha,
             prioridad,
             ft.ElevatedButton("Guardar", on_click=guardar),
-            ft.TextButton("Cancelar", on_click=lambda e: mostrar_tareas(usuario))
+            ft.TextButton(
+                "Cancelar", on_click=lambda e: mostrar_tareas(usuario))
         )
 
         page.update()
-
 
     # INICIO
     mostrar_login()
