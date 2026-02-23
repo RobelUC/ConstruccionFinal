@@ -2,10 +2,9 @@
 Gestión de persistencia optimizada con SQLAlchemy.
 Define el esquema relacional, índices de búsqueda y validaciones de integridad.
 """
-
-from sqlalchemy import Column, Integer, String, ForeignKey, create_engine, Index
+from pathlib import Path
+from sqlalchemy import Column, Integer, String, ForeignKey, create_engine
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
-import os
 
 Base = declarative_base()
 
@@ -20,8 +19,7 @@ class Usuario(Base):
     nombre = Column(String, nullable=False)
 
     # RELACIÓN: Un usuario puede tener múltiples tareas
-    tareas = relationship("Tarea", back_populates="usuario",
-                          cascade="all, delete-orphan")
+    tareas = relationship("Tarea", back_populates="usuario", cascade="all, delete-orphan")
 
 
 class Tarea(Base):
@@ -31,8 +29,9 @@ class Tarea(Base):
     titulo = Column(String, nullable=False)
     descripcion = Column(String)
 
-    # 🔹 NUEVOS CAMPOS (agregados)
-    fecha = Column(String)
+    # 🔹 NOTA DE DISEÑO: Si tu interfaz lo permite, considera cambiar 'fecha'
+    # de String a sqlalchemy.Date o DateTime para poder ordenar y filtrar por fechas reales.
+    fecha = Column(String) 
     prioridad = Column(String, default="Media")
     estado = Column(String, default='pendiente')
 
@@ -46,14 +45,19 @@ class Database:
     Configura la conexión ORM y la creación automática de tablas.
     """
 
-    def __init__(self):
-        # UBICACIÓN CORRECTA: Calcula la raíz del proyecto para DB.sqlite
-        base_dir = os.path.dirname(os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__))))
-        self.db_path = os.path.join(base_dir, 'DB.sqlite')
+    def __init__(self, db_url=None):
+        """
+        Permite inyectar una URL de base de datos (útil para testing).
+        Si no se provee, calcula la ruta por defecto a DB.sqlite.
+        """
+        if not db_url:
+            # Reemplaza los múltiples os.path.dirname con pathlib (más limpio)
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            db_path = base_dir / 'DB.sqlite'
+            db_url = f"sqlite:///{db_path}"
 
         # Configuración del motor SQLAlchemy
-        self.engine = create_engine(f"sqlite:///{self.db_path}")
+        self.engine = create_engine(db_url)
         self.Session = sessionmaker(bind=self.engine)
 
     def inicializar_db(self):
