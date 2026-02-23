@@ -9,6 +9,7 @@ import sys
 import os
 from flet import icons
 import random
+from datetime import datetime
 
 # Compatibilidad Flet
 if not hasattr(ft, "colors"):
@@ -107,43 +108,121 @@ def main(page: ft.Page):
         txt_email = ft.TextField(label="Email", width=280)
         txt_pass = ft.TextField(label="Contraseña", password=True, width=280)
         txt_fecha = ft.TextField(
-            label="Fecha Nacimiento (DD/MM/AAAA)", width=280)
+            label="Fecha Nacimiento (DD/MM/AAAA)",
+            width=280,
+            keyboard_type=ft.KeyboardType.NUMBER,
+            hint_text="Ej: 25/12/2000",
+            max_length=10
+        )
 
         dd_genero = ft.Dropdown(
             width=280,
             label="Género",
             options=[ft.dropdown.Option("M"), ft.dropdown.Option("F")]
         )
+        
+        mensaje = ft.Text("", color="red")
 
         def funcion_guardar(e):
-            if not txt_email.value or not txt_pass.value or not txt_nombre.value:
-                page.snack_bar = ft.SnackBar(
-                    ft.Text("Complete los campos obligatorios"), bgcolor="red")
-                page.snack_bar.open = True
+
+            # Limpiar errores previos
+            txt_nombre.error_text = None
+            txt_email.error_text = None
+            txt_pass.error_text = None
+            txt_fecha.error_text = None
+            mensaje.value = ""
+            mensaje.color = "red"
+            page.update()
+
+            error = False
+
+            # -------------------------
+            # VALIDAR NOMBRE
+            # -------------------------
+            if not txt_nombre.value or not txt_nombre.value.strip():
+                txt_nombre.error_text = "Nombre obligatorio"
+                error = True
+
+            # -------------------------
+            # VALIDAR CORREO
+            # -------------------------
+            email_text = txt_email.value.strip() if txt_email.value else ""
+
+            if not email_text:
+                txt_email.error_text = "Correo no válido"
+                error = True
+            elif "@" not in email_text or "." not in email_text:
+                txt_email.error_text = "Correo no válido"
+                error = True
+            elif email_text.startswith("@") or email_text.endswith("@"):
+                txt_email.error_text = "Correo no válido"
+                error = True
+            elif " " in email_text:
+                txt_email.error_text = "Correo no válido"
+                error = True
+
+            # -------------------------
+            # VALIDAR CONTRASEÑA
+            # -------------------------
+            if not txt_pass.value or not txt_pass.value.strip():
+                txt_pass.error_text = "Contraseña obligatoria"
+                error = True
+
+            # -------------------------
+            # VALIDAR FECHA
+            # -------------------------
+            fecha_text = txt_fecha.value.strip() if txt_fecha.value else ""
+
+            if not fecha_text:
+                txt_fecha.error_text = "Fecha no válida"
+                error = True
+            else:
+                try:
+                    fecha_valida = datetime.strptime(fecha_text, "%d/%m/%Y")
+
+                    if fecha_valida > datetime.now():
+                        txt_fecha.error_text = "Fecha no válida"
+                        error = True
+
+                except ValueError:
+                    txt_fecha.error_text = "Fecha no válida"
+                    error = True
+
+            # -------------------------
+            # SI HAY ERRORES → NO CONTINÚA
+            # -------------------------
+            if error:
+                mensaje.value = "Complete los campos correctamente"
+                mensaje.color = "red"
                 page.update()
                 return
 
+            # -------------------------
+            # REGISTRAR USUARIO
+            # -------------------------
             try:
                 exito = manager.registrar_usuario(
-                    email=txt_email.value,
+                    email=email_text,
                     password=txt_pass.value,
                     nombre=txt_nombre.value
                 )
 
                 if exito:
                     page.snack_bar = ft.SnackBar(
-                        ft.Text("¡Usuario Creado!"), bgcolor="green")
+                        ft.Text("¡Usuario Creado!"),
+                        bgcolor="green"
+                    )
                     page.snack_bar.open = True
                     mostrar_login()
                 else:
-                    page.snack_bar = ft.SnackBar(
-                        ft.Text("Error: El correo ya está registrado"), bgcolor="red")
-                    page.snack_bar.open = True
+                    txt_email.error_text = "El correo ya está registrado"
                     page.update()
 
             except Exception as error:
                 page.snack_bar = ft.SnackBar(
-                    ft.Text(f"Error inesperado: {str(error)}"), bgcolor="red")
+                    ft.Text(f"Error inesperado: {str(error)}"),
+                    bgcolor="red"
+                )
                 page.snack_bar.open = True
                 page.update()
 
@@ -152,7 +231,13 @@ def main(page: ft.Page):
                 [
                     ft.Text("📝", size=60),
                     ft.Text("Crear Cuenta", size=25, weight="bold"),
-                    txt_nombre, txt_apellido, txt_email, txt_pass, txt_fecha, dd_genero,
+                    txt_nombre,
+                    txt_apellido,
+                    txt_email,
+                    txt_pass,
+                    txt_fecha,
+                    dd_genero,
+                    mensaje,
                     ft.Container(height=10),
                     ft.ElevatedButton(
                         "REGISTRARME", on_click=funcion_guardar, width=280, bgcolor="green", color="white"),
@@ -221,7 +306,7 @@ def main(page: ft.Page):
                 ]
             )
 
-            page.overlay.append(dialogo)   # 👈 ESTA ES LA CLAVE
+            page.overlay.append(dialogo)
             dialogo.open = True
             page.update()
 
@@ -447,21 +532,62 @@ def main(page: ft.Page):
 
         mensaje = ft.Text("", color="red")
 
-        def guardar(e):
+        # --- DatePicker dentro de un AlertDialog ---
+        def abrir_calendario(e, fecha_field):
 
+            try:
+                inicial = None
+                if fecha_field.value:
+                    inicial = datetime.strptime(fecha_field.value, "%d/%m/%Y")
+            except:
+                inicial = None
+
+            def fecha_seleccionada(ev):
+                if date_picker.value:
+                    fecha_field.value = date_picker.value.strftime("%d/%m/%Y")
+                    fecha_field.error_text = None
+                    page.update()
+
+            date_picker = ft.DatePicker(
+                first_date=datetime(2000, 1, 1),
+                last_date=datetime(2100, 12, 31),
+                value=inicial if inicial else datetime.now(),
+                on_change=fecha_seleccionada
+            )
+
+            page.overlay.append(date_picker)
+            date_picker.open = True
+            page.update()
+
+        # Icono que abre el calendario junto al TextField
+        icono_calendario = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip="Abrir calendario",
+            on_click=lambda e: abrir_calendario(e, txt_fecha)
+        )
+
+        # Fila con TextField y el icono (mantener diseño compacto)
+        fila_fecha = ft.Row(
+            controls=[txt_fecha, icono_calendario],
+            alignment=ft.MainAxisAlignment.START,
+            spacing=10
+        )
+
+        def guardar(e):
             # Limpiar errores previos
             txt_titulo.error_text = None
             txt_descripcion.error_text = None
             txt_fecha.error_text = None
             mensaje.value = ""
+            mensaje.color = "red"
 
             titulo = txt_titulo.value.strip() if txt_titulo.value else ""
             descripcion = txt_descripcion.value.strip() if txt_descripcion.value else ""
-            fecha = txt_fecha.value.strip() if txt_fecha.value else ""
+            fecha_text = txt_fecha.value.strip() if txt_fecha.value else ""
 
             error = False
 
-            # Validaciones
+            # Validaciones básicas
             if not titulo:
                 txt_titulo.error_text = "El título es obligatorio"
                 error = True
@@ -470,34 +596,43 @@ def main(page: ft.Page):
                 txt_descripcion.error_text = "La descripción es obligatoria"
                 error = True
 
-            if not fecha:
+            if not fecha_text:
                 txt_fecha.error_text = "La fecha es obligatoria"
                 error = True
+            else:
+                # Validar formato dd/mm/aaaa
+                try:
+                    datetime.strptime(fecha_text, "%d/%m/%Y")
+                except ValueError:
+                    txt_fecha.error_text = "Formato inválido. dd/mm/aaaa"
+                    error = True
 
             if error:
-                mensaje.value = "Complete todos los campos obligatorios"
+                mensaje.value = "Complete todos los campos obligatorios correctamente"
                 mensaje.color = "red"
                 page.update()
                 return
 
-            # Guardar tarea
-            manager.agregar_tarea_usuario(
+            # Guardar tarea (sin cambiar la lógica del backend)
+            exito = manager.agregar_tarea_usuario(
                 user_id=usuario["id"],
                 titulo=titulo,
                 descripcion=descripcion,
-                fecha=fecha,
+                fecha=fecha_text,
                 prioridad=prioridad.value
             )
 
-            # Mostrar mensaje de éxito
-            mensaje.value = "✅ La tarea fue creada correctamente"
-            mensaje.color = "green"
-
-            # Limpiar campos
-            txt_titulo.value = ""
-            txt_descripcion.value = ""
-            txt_fecha.value = ""
-            prioridad.value = "Media"
+            if exito:
+                mensaje.value = "✅ La tarea fue creada correctamente"
+                mensaje.color = "green"
+                # Limpiar campos
+                txt_titulo.value = ""
+                txt_descripcion.value = ""
+                txt_fecha.value = ""
+                prioridad.value = "Media"
+            else:
+                mensaje.value = "Error al guardar la tarea"
+                mensaje.color = "red"
 
             page.update()
 
@@ -505,19 +640,18 @@ def main(page: ft.Page):
             ft.Text("Crear Tarea", size=22, weight="bold"),
             txt_titulo,
             txt_descripcion,
-            txt_fecha,
+            fila_fecha,
             prioridad,
             mensaje,
             ft.Row(
                 [
                     ft.ElevatedButton("Guardar", on_click=guardar),
-                    ft.TextButton(
-                        "Cancelar", on_click=lambda e: mostrar_tareas(usuario))
+                    ft.TextButton("Cancelar", on_click=lambda e: mostrar_tareas(usuario))
                 ]
             )
         )
 
-        page.update()
+    page.update()
 
 
 # ---------------------------------------------------------
@@ -528,12 +662,10 @@ def main(page: ft.Page):
         page.clean()
         page.title = "Editar Tarea"
 
-        # Cambiar .titulo -> ["titulo"], .descripcion -> ["descripcion"], etc.
+        # Campos con valores iniciales desde 'tarea'
         titulo = ft.TextField(label="Título", value=tarea["titulo"])
-        descripcion = ft.TextField(
-            label="Descripción", value=tarea["descripcion"], multiline=True)
-        # .get para evitar error si no hay fecha
-        fecha = ft.TextField(label="Fecha", value=tarea.get("fecha", ""))
+        descripcion = ft.TextField(label="Descripción", value=tarea["descripcion"], multiline=True)
+        fecha_field = ft.TextField(label="Fecha (dd/mm/aaaa)", value=tarea.get("fecha", ""))
         prioridad = ft.Dropdown(
             label="Prioridad",
             value=tarea.get("prioridad", "Media"),
@@ -544,13 +676,59 @@ def main(page: ft.Page):
             ]
         )
 
-        def guardar(e):
-            # Usar diccionario con llaves
+        # Icono y dialogo de calendario (misma lógica que en crear)
+        def abrir_calendario_editar(e, fecha_field):
+
+            try:
+                inicial = None
+                if fecha_field.value:
+                    inicial = datetime.strptime(fecha_field.value, "%d/%m/%Y")
+            except:
+                inicial = None
+
+            def fecha_seleccionada(ev):
+                if date_picker.value:
+                    fecha_field.value = date_picker.value.strftime("%d/%m/%Y")
+                    fecha_field.error_text = None
+                    page.update()
+
+            date_picker = ft.DatePicker(
+                first_date=datetime(2000, 1, 1),
+                last_date=datetime(2100, 12, 31),
+                value=inicial if inicial else datetime.now(),
+                on_change=fecha_seleccionada
+            )
+
+            page.overlay.append(date_picker)
+            date_picker.open = True
+            page.update()
+
+        icono_calendario = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip="Abrir calendario",
+            on_click=lambda e: abrir_calendario_editar(e, fecha_field)
+        )
+
+        fila_fecha = ft.Row(controls=[fecha_field, icono_calendario], alignment=ft.MainAxisAlignment.START, spacing=10)
+
+        def guardar_editar(e):
+            # Validar fecha si existe
+            fecha_text = fecha_field.value.strip() if fecha_field.value else ""
+
+            if fecha_text:
+                try:
+                    datetime.strptime(fecha_text, "%d/%m/%Y")
+                except ValueError:
+                    fecha_field.error_text = "Formato inválido. dd/mm/aaaa"
+                    page.update()
+                    return
+
+            # Actualizar en DB usando el manager (misma lógica que ya tenías)
             manager.editar_tarea(
                 tarea["id"],
                 titulo.value,
                 descripcion.value,
-                fecha.value,
+                fecha_text,
                 prioridad.value
             )
             mostrar_tareas(usuario)
@@ -559,11 +737,10 @@ def main(page: ft.Page):
             ft.Text("Editar Tarea", size=22, weight="bold"),
             titulo,
             descripcion,
-            fecha,
+            fila_fecha,
             prioridad,
-            ft.ElevatedButton("Guardar", on_click=guardar),
-            ft.TextButton(
-                "Cancelar", on_click=lambda e: mostrar_tareas(usuario))
+            ft.ElevatedButton("Guardar", on_click=guardar_editar),
+            ft.TextButton("Cancelar", on_click=lambda e: mostrar_tareas(usuario))
         )
 
         page.update()
@@ -573,4 +750,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main)
