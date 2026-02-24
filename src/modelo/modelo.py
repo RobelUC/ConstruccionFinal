@@ -19,7 +19,8 @@ class Usuario(Base):
     nombre = Column(String, nullable=False)
 
     # RELACIÓN: Un usuario puede tener múltiples tareas
-    tareas = relationship("Tarea", back_populates="usuario", cascade="all, delete-orphan")
+    tareas = relationship("Tarea", back_populates="usuario",
+                          cascade="all, delete-orphan")
 
 
 class Tarea(Base):
@@ -31,7 +32,7 @@ class Tarea(Base):
 
     # 🔹 NOTA DE DISEÑO: Si tu interfaz lo permite, considera cambiar 'fecha'
     # de String a sqlalchemy.Date o DateTime para poder ordenar y filtrar por fechas reales.
-    fecha = Column(String) 
+    fecha = Column(String)
     prioridad = Column(String, default="Media")
     estado = Column(String, default='pendiente')
 

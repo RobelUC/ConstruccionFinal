@@ -60,11 +60,24 @@ class TaskManager:
     def registrar_usuario(self, email, password, nombre):
         try:
             with self._session_scope() as session:
+                # 1. VERIFICACIÓN DE UNICIDAD:
+                # Buscamos si ya existe un usuario con ese email
+                existe = session.query(Usuario).filter_by(email=email).first()
+                if existe:
+                    # Lanzamos un ValueError específico para que la UI sepa qué pasó
+                    raise ValueError(
+                        "El correo electrónico ya está registrado.")
+
+                # 2. PROCESO DE REGISTRO:
                 pw_hash = hashlib.sha256(password.encode()).hexdigest()
                 nuevo = Usuario(email=email, password=pw_hash, nombre=nombre)
                 session.add(nuevo)
             return True
-        except Exception:
+        except ValueError as ve:
+            # Re-lanzamos el ValueError para que llegue a la interfaz
+            raise ve
+        except Exception as e:
+            print(f"Error en registro: {e}")
             return False
 
     def login(self, email, password):
@@ -151,5 +164,5 @@ class TaskManager:
             query = session.query(Tarea).filter_by(user_id=user_id)
             if estado and estado.lower() != "todas":
                 query = query.filter_by(estado=estado.lower())
-                
+
             return [self._tarea_to_dict(t) for t in query.all()]
